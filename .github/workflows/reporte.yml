@@ -1,0 +1,39 @@
+name: Reporte Diario de Stock
+
+on:
+  schedule:
+    # Todos los días a las 10:00 AM hora Chile (UTC-3 = 13:00 UTC)
+    - cron: "0 13 * * *"
+  workflow_dispatch:  # Permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  generar-reporte:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias Python
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium para Playwright
+        run: playwright install chromium --with-deps
+
+      - name: Ejecutar scraper y enviar reporte
+        env:
+          WAITRY_USER:       ${{ secrets.WAITRY_USER }}
+          WAITRY_PASSWORD:   ${{ secrets.WAITRY_PASSWORD }}
+          PLACE_NAME:        ${{ secrets.PLACE_NAME }}
+          EMAIL_RECIPIENTS:  ${{ secrets.EMAIL_RECIPIENTS }}
+          SMTP_HOST:         ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:         ${{ secrets.SMTP_PORT }}
+          SMTP_USER:         ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
+          LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
+        run: python main.py
