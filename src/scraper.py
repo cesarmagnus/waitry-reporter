@@ -74,10 +74,8 @@ def navigate_to_stock(page) -> bool:
                 log.info(f"=== HTML (chars 3000-6000) ===\n{html[3000:6000]}")
 
         productos_link = page.locator(
-            "a:has-text('Productos'), "
-            "li:has-text('Productos') a, "
-            "span:has-text('Productos'), "
-            "[href*='product']"
+            "md-list-item:has(p.ng-scope:text-is('Productos')), "
+            "md-list-item:has(p:text-is('Productos'))"
         ).first
         productos_link.wait_for(state="visible", timeout=10000)
         productos_link.click()
@@ -91,28 +89,23 @@ def navigate_to_stock(page) -> bool:
     log.info("Buscando menú de tres puntos...")
     try:
         tres_puntos = page.locator(
-            ".ng-scope [class*='dropdown'], "
-            ".ng-scope [class*='menu'], "
-            ".ng-scope button:has-text('...'), "
-            "[class*='three-dot'], "
-            "[class*='more'], "
-            "button[class*='options'], "
-            "i[class*='ellipsis'], "
-            "i[class*='dots']"
+            "md-list-item:has(p.ng-scope:text-is('Productos')) button, "
+            "md-list-item:has(p:text-is('Productos')) .md-secondary-container button, "
+            "md-list-item:has(p:text-is('Productos')) md-button"
         ).first
         tres_puntos.wait_for(state="visible", timeout=8000)
         tres_puntos.click()
         log.info("Clic en tres puntos exitoso.")
     except Exception:
-        log.warning("Selector principal falló, intentando fallback para tres puntos...")
+        log.warning("Selector principal falló, intentando hover para revelar tres puntos...")
         try:
-            page.locator(".ng-scope").first.hover()
-            page.wait_for_timeout(500)
+            item = page.locator("md-list-item:has(p.ng-scope:text-is('Productos'))").first
+            item.hover()
+            page.wait_for_timeout(1000)
             tres_puntos = page.locator(
+                "md-list-item:has(p:text-is('Productos')) button, "
                 "[class*='dropdown-toggle'], "
-                "[data-toggle='dropdown'], "
-                "button:has-text('⋮'), "
-                "button:has-text('•••')"
+                "[data-toggle='dropdown']"
             ).first
             tres_puntos.click()
         except Exception as e2:
@@ -123,10 +116,11 @@ def navigate_to_stock(page) -> bool:
     log.info("Buscando opción 'Stock' en el menú desplegable...")
     try:
         stock_option = page.locator(
+            "p.ng-scope:text-is('Stock'), "
             "a:has-text('Stock'), "
             "li:has-text('Stock') a, "
             "button:has-text('Stock'), "
-            "[class*='dropdown'] :has-text('Stock')"
+            ".ng-scope:text-is('Stock')"
         ).first
         stock_option.wait_for(state="visible", timeout=8000)
         stock_option.click()
