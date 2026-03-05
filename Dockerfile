@@ -25,4 +25,4 @@ COPY . .
 
 ENV TZ=America/Santiago
 
-CMD ["python", "main.py"]
+CMD ["python", "-c", "import sys; print('Python OK', flush=True); print('Version:', sys.version, flush=True); import playwright; print('Playwright OK', flush=True)"]
