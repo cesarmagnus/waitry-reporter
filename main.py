@@ -6,11 +6,16 @@ Ejecuta scraping → genera PDF → envía por email.
 import os
 import sys
 import logging
+import traceback
 from datetime import datetime
 from pathlib import Path
 
 # Agregar src al path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+# Forzar flush inmediato en stdout para que Railway capture los logs
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 from scraper import scrape_waitry
 from report_generator import generate_pdf
@@ -91,4 +96,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        log.error(f"Error fatal: {e}")
+        log.error(traceback.format_exc())
+        sys.exit(1)
