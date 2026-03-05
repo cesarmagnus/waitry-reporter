@@ -1,11 +1,13 @@
 """
 Waitry Stock Scraper
-Hace login en app.waitry.net, extrae datos de stock y genera un reporte PDF.
+Hace login en app.waitry.net, navega a Productos → Stock,
+usa el botón Exportar para descargar el CSV y retorna los datos.
 """
 
 import os
+import csv
+import io
 import logging
-from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -17,121 +19,207 @@ def login(page, username: str, password: str) -> bool:
     log.info("Navegando al login de Waitry...")
     page.goto("https://app.waitry.net/", wait_until="networkidle")
 
-    # Esperar campo de usuario
     page.wait_for_selector("input[type='email'], input[name='email'], input[name='username']", timeout=15000)
 
-    # Completar credenciales
-    email_input = page.locator("input[type='email'], input[name='email'], input[name='username']").first
-    email_input.fill(username)
-
-    password_input = page.locator("input[type='password']").first
-    password_input.fill(password)
-
-    # Click en botón de login
+    page.locator("input[type='email'], input[name='email'], input[name='username']").first.fill(username)
+    page.locator("input[type='password']").first.fill(password)
     page.locator("button[type='submit'], button:has-text('Ingresar'), button:has-text('Login'), button:has-text('Entrar')").first.click()
 
     try:
-        # Esperar que la URL cambie (login exitoso)
         page.wait_for_url(lambda url: "login" not in url.lower(), timeout=15000)
         log.info("Login exitoso.")
         return True
     except PlaywrightTimeout:
-        log.error("Falló el login. Verificar credenciales o estructura del formulario.")
+        log.error("Falló el login. Verificar credenciales.")
         return False
 
 
 def navigate_to_stock(page) -> bool:
-    """Navega a la sección de stock/inventario."""
-    log.info("Buscando sección de stock...")
-
-    # Intentar múltiples selectores comunes en apps de restaurantes
-    stock_selectors = [
-        "a:has-text('Stock')",
-        "a:has-text('Inventario')",
-        "a:has-text('Productos')",
-        "[href*='stock']",
-        "[href*='inventory']",
-        "[href*='inventario']",
-        "nav a:has-text('Stock')",
-    ]
-
-    for selector in stock_selectors:
-        try:
-            element = page.locator(selector).first
-            if element.is_visible(timeout=3000):
-                element.click()
-                page.wait_for_load_state("networkidle")
-                log.info(f"Navegué a stock usando selector: {selector}")
-                return True
-        except Exception:
-            continue
-
-    log.warning("No se encontró enlace a stock automáticamente. Intentando URL directa...")
-    for path in ["/stock", "/inventario", "/inventory", "/productos"]:
-        try:
-            base = page.url.split("/")[0] + "//" + page.url.split("/")[2]
-            page.goto(base + path, wait_until="networkidle", timeout=8000)
-            if "stock" in page.url or "invent" in page.url or "product" in page.url:
-                return True
-        except Exception:
-            continue
-
-    return False
-
-
-def extract_stock_data(page) -> list[dict]:
     """
-    Extrae tabla de stock de la página actual.
-    Retorna lista de dicts con los datos encontrados.
+    Navega por el menú de Waitry:
+    1. Clic en 'Productos' en el menú lateral
+    2. Clic en los tres puntos (menú contextual, clase ng-scope)
+    3. Clic en la opción 'Stock'
     """
-    log.info("Extrayendo datos de stock...")
-    products = []
+    log.info("Navegando a Productos...")
 
+    # ── Paso 1: clic en "Productos" en el menú lateral ────────────────────
     try:
-        # Esperar que haya contenido cargado
-        page.wait_for_selector("table, [class*='table'], [class*='grid'], [class*='list']", timeout=10000)
+        productos_link = page.locator(
+            "a:has-text('Productos'), "
+            "li:has-text('Productos') a, "
+            "span:has-text('Productos'), "
+            "[href*='product']"
+        ).first
+        productos_link.wait_for(state="visible", timeout=10000)
+        productos_link.click()
+        page.wait_for_load_state("networkidle")
+        log.info("Clic en 'Productos' exitoso.")
+    except Exception as e:
+        log.error(f"No se encontró el menú 'Productos': {e}")
+        return False
 
-        # Intentar extraer tabla HTML estándar
-        rows = page.locator("table tbody tr").all()
+    # ── Paso 2: clic en los tres puntos (ng-scope) ────────────────────────
+    log.info("Buscando menú de tres puntos...")
+    try:
+        tres_puntos = page.locator(
+            ".ng-scope [class*='dropdown'], "
+            ".ng-scope [class*='menu'], "
+            ".ng-scope button:has-text('...'), "
+            "[class*='three-dot'], "
+            "[class*='more'], "
+            "button[class*='options'], "
+            "i[class*='ellipsis'], "
+            "i[class*='dots']"
+        ).first
+        tres_puntos.wait_for(state="visible", timeout=8000)
+        tres_puntos.click()
+        log.info("Clic en tres puntos exitoso.")
+    except Exception:
+        log.warning("Selector principal falló, intentando fallback para tres puntos...")
+        try:
+            page.locator(".ng-scope").first.hover()
+            page.wait_for_timeout(500)
+            tres_puntos = page.locator(
+                "[class*='dropdown-toggle'], "
+                "[data-toggle='dropdown'], "
+                "button:has-text('⋮'), "
+                "button:has-text('•••')"
+            ).first
+            tres_puntos.click()
+        except Exception as e2:
+            log.error(f"No se pudo encontrar el menú de tres puntos: {e2}")
+            return False
 
-        if rows:
-            # Obtener headers
-            headers = [th.inner_text().strip() for th in page.locator("table thead th").all()]
-            log.info(f"Headers encontrados: {headers}")
+    # ── Paso 3: clic en "Stock" en el dropdown ────────────────────────────
+    log.info("Buscando opción 'Stock' en el menú desplegable...")
+    try:
+        stock_option = page.locator(
+            "a:has-text('Stock'), "
+            "li:has-text('Stock') a, "
+            "button:has-text('Stock'), "
+            "[class*='dropdown'] :has-text('Stock')"
+        ).first
+        stock_option.wait_for(state="visible", timeout=8000)
+        stock_option.click()
+        page.wait_for_load_state("networkidle")
+        log.info("Navegué a la sección Stock exitosamente.")
+        return True
+    except Exception as e:
+        log.error(f"No se encontró la opción 'Stock': {e}")
+        return False
 
-            for row in rows:
-                cells = [td.inner_text().strip() for td in row.locator("td").all()]
-                if cells and any(c for c in cells):
-                    if headers and len(cells) == len(headers):
-                        products.append(dict(zip(headers, cells)))
-                    else:
-                        # Fallback: usar índices genéricos
-                        products.append({f"col_{i}": v for i, v in enumerate(cells)})
 
-        # Si no hay tabla HTML, intentar leer cards/grid
-        if not products:
-            cards = page.locator("[class*='product'], [class*='item'], [class*='card']").all()
-            for card in cards:
-                text = card.inner_text().strip()
-                if text:
-                    products.append({"descripcion": text})
+def export_and_parse(page) -> list[dict]:
+    """
+    Hace clic en 'Exportar', captura el archivo descargado
+    y retorna los datos como lista de dicts.
+    """
+    log.info("Buscando botón 'Exportar'...")
+    try:
+        export_btn = page.locator(
+            "button:has-text('Exportar'), "
+            "a:has-text('Exportar'), "
+            "[class*='export']:has-text('Exportar')"
+        ).first
+        export_btn.wait_for(state="visible", timeout=10000)
+
+        with page.expect_download(timeout=20000) as download_info:
+            export_btn.click()
+
+        download = download_info.value
+        log.info(f"Archivo descargado: {download.suggested_filename}")
+        filepath = download.path()
+        filename = download.suggested_filename.lower()
+
+        if filename.endswith(".csv"):
+            return _parse_csv(filepath)
+        elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+            return _parse_excel(filepath)
+        else:
+            log.warning(f"Formato desconocido ({filename}), intentando como CSV...")
+            return _parse_csv(filepath)
 
     except PlaywrightTimeout:
-        log.warning("Timeout esperando tabla de stock.")
+        log.warning("No se pudo usar el botón Exportar. Leyendo tabla directamente...")
+        return _extract_table_fallback(page)
     except Exception as e:
-        log.error(f"Error extrayendo datos: {e}")
+        log.error(f"Error al exportar: {e}")
+        return _extract_table_fallback(page)
 
-    log.info(f"Productos extraídos: {len(products)}")
+
+def _parse_csv(filepath: str) -> list[dict]:
+    """Parsea un archivo CSV descargado."""
+    products = []
+    for encoding in ["utf-8-sig", "latin-1"]:
+        try:
+            with open(filepath, newline="", encoding=encoding) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    products.append(dict(row))
+            log.info(f"CSV parseado: {len(products)} productos.")
+            return products
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            log.error(f"Error parseando CSV: {e}")
+            return []
+    return products
+
+
+def _parse_excel(filepath: str) -> list[dict]:
+    """Parsea un archivo Excel descargado."""
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return []
+        headers = [str(h).strip() if h else f"col_{i}" for i, h in enumerate(rows[0])]
+        products = []
+        for row in rows[1:]:
+            if any(cell is not None for cell in row):
+                products.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in row])))
+        log.info(f"Excel parseado: {len(products)} productos.")
+        return products
+    except ImportError:
+        log.error("openpyxl no instalado. Agregá 'openpyxl' a requirements.txt.")
+        return []
+    except Exception as e:
+        log.error(f"Error parseando Excel: {e}")
+        return []
+
+
+def _extract_table_fallback(page) -> list[dict]:
+    """Fallback: extrae la tabla HTML directamente si el export falla."""
+    log.info("Extrayendo tabla HTML como fallback...")
+    products = []
+    try:
+        page.wait_for_selector("table", timeout=8000)
+        headers = [th.inner_text().strip() for th in page.locator("table thead th").all()]
+        rows = page.locator("table tbody tr").all()
+        for row in rows:
+            cells = [td.inner_text().strip() for td in row.locator("td").all()]
+            if cells and any(c for c in cells):
+                if headers and len(cells) == len(headers):
+                    products.append(dict(zip(headers, cells)))
+                else:
+                    products.append({f"col_{i}": v for i, v in enumerate(cells)})
+        log.info(f"Tabla HTML extraída: {len(products)} productos.")
+    except Exception as e:
+        log.error(f"Fallback también falló: {e}")
     return products
 
 
 def scrape_waitry(username: str, password: str, headless: bool = True) -> list[dict]:
-    """Función principal de scraping. Retorna lista de productos con stock."""
+    """Función principal. Retorna lista de productos con stock."""
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=headless)
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
+            accept_downloads=True,
         )
         page = context.new_page()
 
@@ -140,18 +228,16 @@ def scrape_waitry(username: str, password: str, headless: bool = True) -> list[d
                 return []
 
             if not navigate_to_stock(page):
-                log.warning("No se pudo navegar a la sección de stock.")
-                # Igual intentamos extraer lo que hay en pantalla
-            
-            data = extract_stock_data(page)
-            return data
+                log.warning("No se pudo navegar al stock. Intentando extracción de emergencia...")
+                return _extract_table_fallback(page)
+
+            return export_and_parse(page)
 
         except Exception as e:
             log.error(f"Error durante el scraping: {e}")
-            # Guardar screenshot para debugging
             try:
                 page.screenshot(path="/tmp/waitry_error.png")
-                log.info("Screenshot guardado en /tmp/waitry_error.png")
+                log.info("Screenshot de error guardado en /tmp/waitry_error.png")
             except Exception:
                 pass
             return []
