@@ -215,7 +215,12 @@ def _extract_table_fallback(page) -> list[dict]:
 def scrape_waitry(username: str, password: str, headless: bool = True) -> list[dict]:
     """Función principal. Retorna lista de productos con stock."""
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
+        log.info("Iniciando Chromium...")
+        browser = pw.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        )
+        log.info("Chromium iniciado correctamente.")
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
             user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
