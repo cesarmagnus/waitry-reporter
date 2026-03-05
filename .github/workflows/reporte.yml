@@ -46,4 +46,5 @@ jobs:
           SMTP_USER:         ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
           LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
+          DEMO_MODE:         "false"
         run: python main.py
