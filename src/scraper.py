@@ -56,12 +56,22 @@ def navigate_to_stock(page) -> bool:
     # ── Paso 1: clic en "Productos" en el menú lateral ────────────────────
     try:
         # Esperar más tiempo para que Angular cargue el menú
-        page.wait_for_timeout(4000)
+        page.wait_for_timeout(8000)
 
         # En modo debug, loguear HTML completo para inspeccionar estructura
         if os.getenv("DEBUG_MODE") == "true":
             html = page.content()
-            log.info(f"=== HTML POST-LOGIN (primeros 3000 chars) ===\n{html[:3000]}")
+            # Buscar específicamente la parte del menú lateral
+            import re
+            # Extraer fragmento relevante buscando palabras clave del menú
+            for keyword in ["Productos", "sidebar", "nav", "menu"]:
+                idx = html.find(keyword)
+                if idx != -1:
+                    log.info(f"=== Encontrado '{keyword}' en posición {idx} ===")
+                    log.info(f"Contexto: {html[max(0,idx-200):idx+500]}")
+                    break
+            else:
+                log.info(f"=== HTML (chars 3000-6000) ===\n{html[3000:6000]}")
 
         productos_link = page.locator(
             "a:has-text('Productos'), "
