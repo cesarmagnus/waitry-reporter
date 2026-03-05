@@ -1,0 +1,10 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Cron job: ejecutar todos los días a las 7:00 AM (hora del servidor)
+# Ajustar el horario según tu timezone
+cronSchedule = "0 10 * * *"  # 10:00 UTC = 7:00 AM Argentina (UTC-3)
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
