@@ -47,6 +47,7 @@ jobs:
           SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
           LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
           DEMO_MODE:         "false"
+          DEBUG_MODE:        "true"
         run: python main.py
 
       - name: Subir screenshots de debugging
