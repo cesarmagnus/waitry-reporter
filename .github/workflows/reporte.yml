@@ -48,3 +48,11 @@ jobs:
           LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
           DEMO_MODE:         "false"
         run: python main.py
+
+      - name: Subir screenshots de debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: /tmp/waitry_*.png
+          if-no-files-found: ignore
