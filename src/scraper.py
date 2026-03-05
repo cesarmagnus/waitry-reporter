@@ -58,13 +58,10 @@ def navigate_to_stock(page) -> bool:
         # Esperar más tiempo para que Angular cargue el menú
         page.wait_for_timeout(4000)
 
-        # Guardar screenshot para debugging
-        page.screenshot(path="/tmp/waitry_post_login.png")
-        log.info("Screenshot guardado.")
-
-        # Loguear el HTML del nav para ver la estructura real
-        nav_html = page.locator("nav, [class*='sidebar'], [class*='menu'], [class*='nav']").first.inner_html()
-        log.info(f"HTML del menú (primeros 1000 chars): {nav_html[:1000]}")
+        # En modo debug, loguear HTML completo para inspeccionar estructura
+        if os.getenv("DEBUG_MODE") == "true":
+            html = page.content()
+            log.info(f"=== HTML POST-LOGIN (primeros 3000 chars) ===\n{html[:3000]}")
 
         productos_link = page.locator(
             "a:has-text('Productos'), "
