@@ -116,14 +116,13 @@ def navigate_to_stock(page) -> bool:
     log.info("Buscando opción 'Stock' en el menú desplegable...")
     try:
         stock_option = page.locator(
+            "button[role='menuitem']:has-text('Stock'), "
             "p.ng-scope:text-is('Stock'), "
             "a:has-text('Stock'), "
-            "li:has-text('Stock') a, "
-            "button:has-text('Stock'), "
             ".ng-scope:text-is('Stock')"
         ).first
-        stock_option.wait_for(state="visible", timeout=8000)
-        stock_option.click()
+        # Usar force=True porque Angular puede tener el elemento hidden pero clickeable
+        stock_option.click(force=True, timeout=8000)
         page.wait_for_load_state("networkidle")
         log.info("Navegué a la sección Stock exitosamente.")
         return True
