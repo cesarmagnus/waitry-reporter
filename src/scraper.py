@@ -17,20 +17,30 @@ log = logging.getLogger(__name__)
 def login(page, username: str, password: str) -> bool:
     """Inicia sesión en Waitry. Retorna True si fue exitoso."""
     log.info("Navegando al login de Waitry...")
-    page.goto("https://app.waitry.net/", wait_until="networkidle")
+    page.goto("https://app.waitry.net/", wait_until="networkidle", timeout=30000)
 
-    page.wait_for_selector("input[type='email'], input[name='email'], input[name='username']", timeout=15000)
+    # Esperar extra para que Angular termine de renderizar
+    page.wait_for_timeout(3000)
 
-    page.locator("input[type='email'], input[name='email'], input[name='username']").first.fill(username)
+    log.info(f"URL actual: {page.url}")
+    log.info(f"Título de página: {page.title()}")
+
+    page.wait_for_selector(
+        "input[type='email'], input[name='email'], input[name='username'], input[type='text']",
+        timeout=30000
+    )
+
+    page.locator("input[type='email'], input[name='email'], input[name='username'], input[type='text']").first.fill(username)
     page.locator("input[type='password']").first.fill(password)
     page.locator("button[type='submit'], button:has-text('Ingresar'), button:has-text('Login'), button:has-text('Entrar')").first.click()
 
     try:
-        page.wait_for_url(lambda url: "login" not in url.lower(), timeout=15000)
+        page.wait_for_url(lambda url: "login" not in url.lower(), timeout=30000)
         log.info("Login exitoso.")
         return True
     except PlaywrightTimeout:
-        log.error("Falló el login. Verificar credenciales.")
+        log.error(f"Falló el login. URL actual: {page.url}")
+        log.error(f"Contenido visible: {page.content()[:500]}")
         return False
 
 
@@ -249,3 +259,4 @@ def scrape_waitry(username: str, password: str, headless: bool = True) -> list[d
 
         finally:
             browser.close()
+
