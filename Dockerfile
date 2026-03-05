@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
     libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
     fonts-liberation fonts-dejavu \
+    xvfb x11-utils \
+    libx11-xcb1 libxcb-dri3-0 libxss1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -16,13 +18,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar browser de Playwright
-RUN playwright install chromium
+# Instalar browser de Playwright con todas sus dependencias del sistema
+RUN playwright install chromium --with-deps
 
 # Copiar código
 COPY . .
 
-# Variable de entorno para timezone (ajustar según tu región)
-ENV TZ=America/Argentina/Buenos_Aires
+# Timezone Chile
+ENV TZ=America/Santiago
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 CMD ["python", "main.py"]
+
