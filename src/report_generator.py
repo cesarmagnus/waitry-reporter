@@ -139,7 +139,11 @@ def _normalize_products(raw_data: list[dict], categoria_filtro: str | None = Non
 
     # Filtrar por categoría si se especifica
     if categoria_filtro:
-        normalized = [p for p in normalized if categoria_filtro.lower() in p["categoria"].lower()]
+        normalized = [
+            p for p in normalized
+            if categoria_filtro.lower() in p["categoria"].lower()
+            and "huevos de chocolate" not in p["categoria"].lower()
+        ]
         log.info(f"Filtrado por '{categoria_filtro}': {len(normalized)} productos.")  # type: ignore
 
     return normalized
@@ -300,45 +304,6 @@ def generate_pdf(
     story.append(Paragraph("Resumen ejecutivo", styles["SectionTitle"]))
     story.append(_summary_table(products, styles))
     story.append(Spacer(1, 14))
-
-    # ── Alertas de stock bajo ────────────────────────────────────────────────
-    low = [p for p in products if 0 < p["stock"] <= LOW_STOCK_THRESHOLD]
-    no_stock = [p for p in products if p["stock"] == 0]
-
-    if no_stock or low:
-        story.append(Paragraph("⚠ Alertas", styles["SectionTitle"]))
-
-        alert_data = []
-        for p in no_stock:
-            alert_data.append([
-                Paragraph(f"🔴  {p['nombre']}", styles["AlertText"]),
-                Paragraph("SIN STOCK — requiere reposición inmediata", styles["AlertText"]),
-            ])
-        for p in low:
-            alert_data.append([
-                Paragraph(f"🟡  {p['nombre']}", ParagraphStyle(
-                    "warnAlert", fontName="Helvetica-Bold", fontSize=9,
-                    textColor=colors.HexColor("#856404")
-                )),
-                Paragraph(f"Stock bajo: {p['stock']:g} {p['unidad']} disponibles", ParagraphStyle(
-                    "warnAlertBody", fontName="Helvetica", fontSize=9,
-                    textColor=colors.HexColor("#856404")
-                )),
-            ])
-
-        if alert_data:
-            page_w = A4[0] - 4*cm
-            at = Table(alert_data, colWidths=[page_w*0.35, page_w*0.65])
-            at.setStyle(TableStyle([
-                ("BACKGROUND",  (0,0), (-1,-1), colors.HexColor("#FFFBF0")),
-                ("BOX",         (0,0), (-1,-1), 0.5, COLOR_ACCENT),
-                ("INNERGRID",   (0,0), (-1,-1), 0.3, colors.HexColor("#FFDDAA")),
-                ("TOPPADDING",  (0,0), (-1,-1), 5),
-                ("BOTTOMPADDING",(0,0),(-1,-1), 5),
-                ("LEFTPADDING", (0,0), (-1,-1), 8),
-            ]))
-            story.append(at)
-            story.append(Spacer(1, 14))
 
     # ── Tabla completa ───────────────────────────────────────────────────────
     story.append(Paragraph("Detalle completo de stock", styles["SectionTitle"]))
