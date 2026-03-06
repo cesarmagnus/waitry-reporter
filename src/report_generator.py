@@ -110,47 +110,30 @@ def build_styles():
 
 
 def _normalize_products(raw_data: list[dict]) -> list[dict]:
-    """
-    Normaliza los datos crudos del scraper a una estructura estándar.
-    Intenta detectar columnas comunes de nombre, stock, categoría, etc.
-    """
+    """Normaliza los datos del Excel de Waitry al formato estándar del reporte."""
     if not raw_data:
         return []
 
     normalized = []
-    first = raw_data[0]
-    keys = list(first.keys())
-
-    # Mapeo heurístico de nombres de columnas
-    name_keys    = [k for k in keys if any(w in k.lower() for w in ["nombre", "producto", "name", "descripcion", "item"])]
-    stock_keys   = [k for k in keys if any(w in k.lower() for w in ["stock", "cantidad", "quantity", "unidad", "qty"])]
-    cat_keys     = [k for k in keys if any(w in k.lower() for w in ["categoria", "category", "tipo", "type", "grupo"])]
-    unit_keys    = [k for k in keys if any(w in k.lower() for w in ["unidad", "unit", "medida"])]
-    price_keys   = [k for k in keys if any(w in k.lower() for w in ["precio", "price", "costo", "cost"])]
-
-    name_key  = name_keys[0]  if name_keys  else keys[0]
-    stock_key = stock_keys[0] if stock_keys else (keys[1] if len(keys) > 1 else None)
-    cat_key   = cat_keys[0]   if cat_keys   else None
-    unit_key  = unit_keys[0]  if unit_keys  else None
-    price_key = price_keys[0] if price_keys else None
-
     for row in raw_data:
-        name = row.get(name_key, "—")
-        raw_stock = row.get(stock_key, "0") if stock_key else "0"
-        
-        # Limpiar número
+        # Columnas exactas del export de Waitry
+        nombre = row.get("Nombre", row.get("nombre", "—")).strip()
+        stock_raw = row.get("Stock actual", row.get("stock actual", "0")).strip()
+
+        # Limpiar y convertir stock
         try:
-            stock_val = float(str(raw_stock).replace(",", ".").replace(" ", "").replace("$", "") or 0)
-        except ValueError:
+            stock_val = float(stock_raw.replace(",", ".").replace(" ", "") or 0)
+        except (ValueError, AttributeError):
             stock_val = 0.0
 
-        normalized.append({
-            "nombre":    name,
-            "stock":     stock_val,
-            "categoria": row.get(cat_key, "—") if cat_key else "—",
-            "unidad":    row.get(unit_key, "un.") if unit_key else "un.",
-            "precio":    row.get(price_key, "—") if price_key else "—",
-        })
+        if nombre and nombre != "—":
+            normalized.append({
+                "nombre":    nombre,
+                "stock":     stock_val,
+                "categoria": "—",
+                "unidad":    "un.",
+                "precio":    "—",
+            })
 
     return normalized
 
