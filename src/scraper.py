@@ -211,27 +211,58 @@ def _parse_csv(filepath: str) -> list[dict]:
 
 
 def _parse_excel(filepath: str) -> list[dict]:
-    """Parsea un archivo Excel descargado."""
-    try:
-        import openpyxl
-        wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
+    """Parsea un archivo Excel descargado, detectando el formato real."""
+    # Leer los primeros bytes para detectar el formato real
+    with open(filepath, "rb") as f:
+        header = f.read(8)
+
+    # Magic bytes: ZIP = xlsx, D0CF = xls antiguo, texto = CSV
+    is_xlsx = header[:4] == b'PK\x03\x04'
+    is_xls  = header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
+
+    if is_xlsx:
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return []
+            headers = [str(h).strip() if h else f"col_{i}" for i, h in enumerate(rows[0])]
+            products = []
+            for row in rows[1:]:
+                if any(cell is not None for cell in row):
+                    products.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in row])))
+            log.info(f"Excel (xlsx) parseado: {len(products)} productos.")
+            return products
+        except Exception as e:
+            log.error(f"Error parseando xlsx: {e}")
             return []
-        headers = [str(h).strip() if h else f"col_{i}" for i, h in enumerate(rows[0])]
-        products = []
-        for row in rows[1:]:
-            if any(cell is not None for cell in row):
-                products.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in row])))
-        log.info(f"Excel parseado: {len(products)} productos.")
-        return products
-    except ImportError:
-        log.error("openpyxl no instalado. Agregá 'openpyxl' a requirements.txt.")
-        return []
-    except Exception as e:
-        log.error(f"Error parseando Excel: {e}")
-        return []
+
+    elif is_xls:
+        try:
+            import xlrd
+            wb = xlrd.open_workbook(filepath)
+            ws = wb.sheet_by_index(0)
+            headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
+            products = []
+            for r in range(1, ws.nrows):
+                row = [str(ws.cell_value(r, c)).strip() for c in range(ws.ncols)]
+                if any(row):
+                    products.append(dict(zip(headers, row)))
+            log.info(f"Excel (xls) parseado: {len(products)} productos.")
+            return products
+        except ImportError:
+            log.warning("xlrd no instalado, intentando como CSV...")
+            return _parse_csv(filepath)
+        except Exception as e:
+            log.error(f"Error parseando xls: {e}")
+            return []
+
+    else:
+        # Probablemente es un CSV con extensión xlsx
+        log.warning("Archivo no es Excel válido, intentando como CSV...")
+        return _parse_csv(filepath)
 
 
 def _extract_table_fallback(page) -> list[dict]:
