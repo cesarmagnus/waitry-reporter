@@ -228,12 +228,12 @@ def _parse_excel(filepath: str) -> list[dict]:
                 log.info(f"Contenido del ZIP: {z.namelist()}")
         except Exception as ze:
             log.warning(f"No es un ZIP válido: {ze}")
-            # Leer primeros bytes como texto para ver si es CSV
             with open(filepath, "r", encoding="utf-8-sig", errors="ignore") as f:
                 preview = f.read(500)
             log.info(f"Primeros 500 chars del archivo: {preview}")
             return _parse_csv(filepath)
 
+        # Intentar con openpyxl primero
         try:
             import openpyxl
             wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
@@ -249,7 +249,57 @@ def _parse_excel(filepath: str) -> list[dict]:
             log.info(f"Excel (xlsx) parseado: {len(products)} productos.")
             return products
         except Exception as e:
-            log.error(f"Error parseando xlsx: {e}")
+            log.warning(f"openpyxl falló ({e}), leyendo XML directamente...")
+
+        # Fallback: leer sheet1.xml directamente del ZIP
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+
+            with zipfile.ZipFile(filepath) as z:
+                # Leer strings compartidos
+                shared_strings = []
+                if 'xl/sharedStrings.xml' in z.namelist():
+                    with z.open('xl/sharedStrings.xml') as f:
+                        tree = ET.parse(f)
+                        root = tree.getroot()
+                        ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
+                        for si in root.findall(f'.//{ns}si'):
+                            texts = [t.text or '' for t in si.findall(f'.//{ns}t')]
+                            shared_strings.append(''.join(texts))
+
+                # Leer sheet1.xml
+                with z.open('xl/worksheets/sheet1.xml') as f:
+                    tree = ET.parse(f)
+                    root = tree.getroot()
+                    ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
+
+                    rows_data = []
+                    for row in root.findall(f'.//{ns}row'):
+                        row_values = []
+                        for c in row.findall(f'{ns}c'):
+                            t = c.get('t', '')
+                            v_el = c.find(f'{ns}v')
+                            val = ''
+                            if v_el is not None and v_el.text:
+                                if t == 's':  # shared string
+                                    val = shared_strings[int(v_el.text)]
+                                else:
+                                    val = v_el.text
+                            row_values.append(val.strip())
+                        if any(row_values):
+                            rows_data.append(row_values)
+
+            if not rows_data:
+                return []
+
+            headers = rows_data[0]
+            products = [dict(zip(headers, row)) for row in rows_data[1:] if any(row)]
+            log.info(f"XML directo parseado: {len(products)} productos.")
+            return products
+
+        except Exception as e2:
+            log.error(f"Error leyendo XML directo: {e2}")
             return []
 
     elif is_xls:
