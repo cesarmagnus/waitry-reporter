@@ -386,8 +386,81 @@ def _extract_table_fallback(page) -> list[dict]:
     return products
 
 
-def scrape_waitry(username: str, password: str, headless: bool = True) -> list[dict]:
-    """Función principal. Retorna lista de productos con stock."""
+def get_all_places(page) -> list[dict]:
+    """
+    Extrae todas las sucursales disponibles en el selector del header.
+    Retorna lista de dicts con placeId y nombre.
+    """
+    log.info("Extrayendo sucursales disponibles...")
+    try:
+        places = page.evaluate("""
+            () => {
+                const buttons = document.querySelectorAll('button[ng-click*="changePlace"]');
+                const results = [];
+                for (const btn of buttons) {
+                    const ngClick = btn.getAttribute('ng-click') || '';
+                    const match = ngClick.match(/changePlace\\((.+?)\\)/);
+                    const placeId = match ? match[1].trim() : null;
+                    const name = btn.textContent.trim();
+                    if (placeId && name) {
+                        results.push({ placeId, name });
+                    }
+                }
+                return results;
+            }
+        """)
+        log.info(f"Sucursales encontradas: {[p['name'] for p in places]}")
+        return places
+    except Exception as e:
+        log.error(f"Error extrayendo sucursales: {e}")
+        return []
+
+
+def switch_place(page, place_id: str, place_name: str) -> bool:
+    """Cambia a la sucursal indicada usando changePlace()."""
+    log.info(f"Cambiando a sucursal: {place_name}...")
+    try:
+        # Primero abrir el dropdown de sucursales
+        header_selector = page.locator("div.fleft.ng-binding.ng-scope").first
+        header_selector.wait_for(state="visible", timeout=8000)
+        header_selector.click()
+        page.wait_for_timeout(1000)
+
+        # Hacer clic en la sucursal específica via JS
+        clicked = page.evaluate(f"""
+            () => {{
+                const buttons = document.querySelectorAll('button[ng-click*="changePlace"]');
+                for (const btn of buttons) {{
+                    const ngClick = btn.getAttribute('ng-click') || '';
+                    if (ngClick.includes('{place_id}')) {{
+                        btn.click();
+                        return btn.textContent.trim();
+                    }}
+                }}
+                return null;
+            }}
+        """)
+
+        if clicked:
+            log.info(f"Cambiado a sucursal '{clicked}' exitosamente.")
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+            return True
+        else:
+            log.error(f"No se encontró el botón para placeId: {place_id}")
+            return False
+    except Exception as e:
+        log.error(f"Error cambiando sucursal: {e}")
+        return False
+
+
+def scrape_all_places(username: str, password: str, headless: bool = True) -> list[dict]:
+    """
+    Función principal. Itera por todas las sucursales y retorna
+    lista de dicts con {place_name, products}.
+    """
+    results = []
+
     with sync_playwright() as pw:
         log.info("Iniciando Chromium...")
         browser = pw.chromium.launch(
@@ -406,20 +479,47 @@ def scrape_waitry(username: str, password: str, headless: bool = True) -> list[d
             if not login(page, username, password):
                 return []
 
-            if not navigate_to_stock(page):
-                log.warning("No se pudo navegar al stock. Intentando extracción de emergencia...")
-                return _extract_table_fallback(page)
+            # Obtener lista de sucursales
+            places = get_all_places(page)
+            if not places:
+                log.warning("No se encontraron sucursales, intentando con sucursal actual...")
+                places = [{"placeId": None, "name": "Principal"}]
 
-            return export_and_parse(page)
+            for place in places:
+                place_name = place["name"]
+                place_id   = place["placeId"]
+
+                # Cambiar a la sucursal (si hay más de una)
+                if place_id and len(places) > 1:
+                    if not switch_place(page, place_id, place_name):
+                        log.warning(f"Saltando sucursal '{place_name}'.")
+                        continue
+
+                # Navegar a stock y exportar
+                if not navigate_to_stock(page):
+                    log.warning(f"No se pudo navegar al stock de '{place_name}'.")
+                    results.append({"place_name": place_name, "products": []})
+                    continue
+
+                products = export_and_parse(page)
+                log.info(f"Sucursal '{place_name}': {len(products)} productos.")
+                results.append({"place_name": place_name, "products": products})
 
         except Exception as e:
             log.error(f"Error durante el scraping: {e}")
             try:
                 page.screenshot(path="/tmp/waitry_error.png")
-                log.info("Screenshot de error guardado en /tmp/waitry_error.png")
             except Exception:
                 pass
-            return []
-
         finally:
             browser.close()
+
+    return results
+
+
+def scrape_waitry(username: str, password: str, headless: bool = True) -> list[dict]:
+    """Mantiene compatibilidad — retorna productos de la primera sucursal."""
+    results = scrape_all_places(username, password, headless)
+    if results:
+        return results[0]["products"]
+    return []
