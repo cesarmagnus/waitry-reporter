@@ -257,9 +257,17 @@ def _parse_excel(filepath: str) -> list[dict]:
             import xml.etree.ElementTree as ET
 
             with zipfile.ZipFile(filepath) as z:
+                # Log del contenido XML para debugging
+                with z.open('xl/worksheets/sheet1.xml') as f:
+                    raw_xml = f.read().decode('utf-8', errors='ignore')
+                    log.info(f"=== sheet1.xml (primeros 1000 chars) ===\n{raw_xml[:1000]}")
+
                 # Leer strings compartidos
                 shared_strings = []
                 if 'xl/sharedStrings.xml' in z.namelist():
+                    with z.open('xl/sharedStrings.xml') as f:
+                        raw_ss = f.read().decode('utf-8', errors='ignore')
+                        log.info(f"=== sharedStrings.xml (primeros 500 chars) ===\n{raw_ss[:500]}")
                     with z.open('xl/sharedStrings.xml') as f:
                         tree = ET.parse(f)
                         root = tree.getroot()
@@ -267,12 +275,14 @@ def _parse_excel(filepath: str) -> list[dict]:
                         for si in root.findall(f'.//{ns}si'):
                             texts = [t.text or '' for t in si.findall(f'.//{ns}t')]
                             shared_strings.append(''.join(texts))
+                    log.info(f"Shared strings encontrados: {shared_strings[:10]}")
 
                 # Leer sheet1.xml
                 with z.open('xl/worksheets/sheet1.xml') as f:
                     tree = ET.parse(f)
                     root = tree.getroot()
                     ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
+                    log.info(f"Namespace detectado: '{ns}'")
 
                     rows_data = []
                     for row in root.findall(f'.//{ns}row'):
