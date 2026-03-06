@@ -389,52 +389,76 @@ def _extract_table_fallback(page) -> list[dict]:
 def get_all_places(page) -> list[dict]:
     """
     Extrae todas las sucursales disponibles en el selector del header.
-    Retorna lista de dicts con placeId y nombre.
+    Espera a que Angular renderice el ng-repeat antes de extraer.
     """
     log.info("Extrayendo sucursales disponibles...")
     try:
+        # Primero abrir el dropdown del header para que Angular renderice las opciones
+        header = page.locator("div.fleft.ng-binding.ng-scope").first
+        header.wait_for(state="visible", timeout=10000)
+        header.click()
+        page.wait_for_timeout(2000)
+
+        # Esperar a que aparezcan los items del ng-repeat
+        page.wait_for_selector("md-list-item[ng-repeat*='place in places']", timeout=8000)
+
+        # Extraer placeId y nombre de cada sucursal via JS
         places = page.evaluate("""
             () => {
-                const buttons = document.querySelectorAll('button[ng-click*="changePlace"]');
+                const items = document.querySelectorAll('md-list-item[ng-repeat*="place in places"]');
                 const results = [];
-                for (const btn of buttons) {
+                for (const item of items) {
+                    // Obtener el botón con ng-click="changePlace(...)"
+                    const btn = item.querySelector('button[ng-click*="changePlace"]');
+                    if (!btn) continue;
                     const ngClick = btn.getAttribute('ng-click') || '';
                     const match = ngClick.match(/changePlace\\((.+?)\\)/);
                     const placeId = match ? match[1].trim() : null;
-                    const name = btn.textContent.trim();
-                    if (placeId && name) {
-                        results.push({ placeId, name });
-                    }
+                    // Obtener el nombre del elemento ng-binding
+                    const nameEl = item.querySelector('.ng-binding');
+                    const name = nameEl ? nameEl.textContent.trim() : `Sucursal ${results.length + 1}`;
+                    if (placeId) results.push({ placeId, name });
                 }
                 return results;
             }
         """)
+
+        # Cerrar el dropdown haciendo clic fuera
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+
         log.info(f"Sucursales encontradas: {[p['name'] for p in places]}")
         return places
+
     except Exception as e:
         log.error(f"Error extrayendo sucursales: {e}")
         return []
 
 
 def switch_place(page, place_id: str, place_name: str) -> bool:
-    """Cambia a la sucursal indicada usando changePlace()."""
+    """Cambia a la sucursal indicada abriendo el dropdown del header."""
     log.info(f"Cambiando a sucursal: {place_name}...")
     try:
-        # Primero abrir el dropdown de sucursales
-        header_selector = page.locator("div.fleft.ng-binding.ng-scope").first
-        header_selector.wait_for(state="visible", timeout=8000)
-        header_selector.click()
-        page.wait_for_timeout(1000)
+        # Abrir dropdown
+        header = page.locator("div.fleft.ng-binding.ng-scope").first
+        header.wait_for(state="visible", timeout=8000)
+        header.click()
+        page.wait_for_timeout(1500)
 
-        # Hacer clic en la sucursal específica via JS
+        # Esperar opciones
+        page.wait_for_selector("md-list-item[ng-repeat*='place in places']", timeout=8000)
+
+        # Clic en la sucursal específica
         clicked = page.evaluate(f"""
             () => {{
-                const buttons = document.querySelectorAll('button[ng-click*="changePlace"]');
-                for (const btn of buttons) {{
+                const items = document.querySelectorAll('md-list-item[ng-repeat*="place in places"]');
+                for (const item of items) {{
+                    const btn = item.querySelector('button[ng-click*="changePlace"]');
+                    if (!btn) continue;
                     const ngClick = btn.getAttribute('ng-click') || '';
                     if (ngClick.includes('{place_id}')) {{
                         btn.click();
-                        return btn.textContent.trim();
+                        return btn.closest('md-list-item').querySelector('.ng-binding')?.textContent.trim() || 'ok';
                     }}
                 }}
                 return null;
@@ -442,12 +466,12 @@ def switch_place(page, place_id: str, place_name: str) -> bool:
         """)
 
         if clicked:
-            log.info(f"Cambiado a sucursal '{clicked}' exitosamente.")
+            log.info(f"Cambiado a '{clicked}' exitosamente.")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(2000)
             return True
         else:
-            log.error(f"No se encontró el botón para placeId: {place_id}")
+            log.error(f"No se encontró botón para placeId: {place_id}")
             return False
     except Exception as e:
         log.error(f"Error cambiando sucursal: {e}")
