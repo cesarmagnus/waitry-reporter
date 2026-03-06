@@ -17,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
-from scraper import scrape_waitry
+from scraper import scrape_all_places
 from report_generator import generate_pdf
-from email_sender import send_report
+from email_sender import send_report_multi
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +37,7 @@ def main():
     # ── Configuración desde variables de entorno ──────────────────────────
     waitry_user  = os.getenv("WAITRY_USER")
     waitry_pass  = os.getenv("WAITRY_PASSWORD")
-    place_name   = os.getenv("PLACE_NAME", "Mi Cafetería")
+    place_name_global = os.getenv("PLACE_NAME", "Mi Cafetería")
     recipients   = os.getenv("EMAIL_RECIPIENTS", "").split(",")
     recipients   = [r.strip() for r in recipients if r.strip()]
     demo_mode    = os.getenv("DEMO_MODE", "false").lower() == "true"
@@ -55,35 +55,43 @@ def main():
     now = datetime.now()
     output_path = f"/tmp/reporte_stock_{now.strftime('%Y%m%d_%H%M')}.pdf"
 
-    # ── 1. Scraping ───────────────────────────────────────────────────────
+    # ── 1. Scraping de todas las sucursales ───────────────────────────────
     if demo_mode:
         log.info("Modo DEMO activo — usando datos de ejemplo.")
-        products = []  # report_generator usará datos demo internamente
+        places_data = [{"place_name": "Sucursal Demo", "products": []}]
     else:
         log.info("Iniciando scraping de Waitry...")
-        products = scrape_waitry(waitry_user, waitry_pass, headless=True)
-        log.info(f"Productos obtenidos: {len(products)}")
+        places_data = scrape_all_places(waitry_user, waitry_pass, headless=True)
+        log.info(f"Sucursales procesadas: {len(places_data)}")
 
-    # ── 2. Generar PDF ────────────────────────────────────────────────────
-    log.info(f"Generando reporte PDF en: {output_path}")
-    generate_pdf(
-        products_raw=products,
-        output_path=output_path,
-        place_name=place_name,
-        report_date=now,
-        categoria_filtro=categoria_filtro,
-    )
-    log.info("PDF generado correctamente.")
+    # ── 2. Generar un PDF por sucursal ────────────────────────────────────
+    pdf_paths = []
+    for place in places_data:
+        place_name = place["place_name"]
+        products   = place["products"]
+        safe_name  = place_name.replace(" ", "_").replace("/", "-")
+        pdf_path   = f"/tmp/reporte_stock_{safe_name}_{now.strftime('%Y%m%d_%H%M')}.pdf"
 
-    # ── 3. Enviar por email ───────────────────────────────────────────────
+        log.info(f"Generando PDF para '{place_name}' ({len(products)} productos)...")
+        generate_pdf(
+            products_raw=products,
+            output_path=pdf_path,
+            place_name=f"{place_name}",
+            report_date=now,
+            categoria_filtro=categoria_filtro,
+        )
+        pdf_paths.append((place_name, pdf_path))
+        log.info(f"PDF generado: {pdf_path}")
+
+    # ── 3. Enviar un solo email con todos los PDFs adjuntos ───────────────
     if demo_mode:
-        log.info(f"Modo DEMO — email no enviado. PDF disponible en: {output_path}")
+        log.info(f"Modo DEMO — email no enviado. PDFs generados: {[p for _, p in pdf_paths]}")
     else:
         log.info(f"Enviando reporte a: {', '.join(recipients)}")
-        success = send_report(
-            pdf_path=output_path,
+        success = send_report_multi(
+            pdf_paths=pdf_paths,
             recipients=recipients,
-            place_name=place_name,
+            place_name=place_name_global,
             report_date=now,
         )
         if success:
