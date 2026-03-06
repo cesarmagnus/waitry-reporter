@@ -109,18 +109,17 @@ def build_styles():
     return styles
 
 
-def _normalize_products(raw_data: list[dict]) -> list[dict]:
+def _normalize_products(raw_data: list[dict], categoria_filtro: str | None = None) -> list[dict]:
     """Normaliza los datos del Excel de Waitry al formato estándar del reporte."""
     if not raw_data:
         return []
 
     normalized = []
     for row in raw_data:
-        # Columnas exactas del export de Waitry
-        nombre = row.get("Nombre", row.get("nombre", "—")).strip()
+        nombre    = row.get("Nombre", row.get("nombre", "—")).strip()
+        categoria = row.get("Productos", row.get("productos", "—")).strip()
         stock_raw = row.get("Stock actual", row.get("stock actual", "0")).strip()
 
-        # Limpiar y convertir stock
         try:
             stock_val = float(stock_raw.replace(",", ".").replace(" ", "") or 0)
         except (ValueError, AttributeError):
@@ -130,10 +129,15 @@ def _normalize_products(raw_data: list[dict]) -> list[dict]:
             normalized.append({
                 "nombre":    nombre,
                 "stock":     stock_val,
-                "categoria": "—",
+                "categoria": categoria,
                 "unidad":    "un.",
                 "precio":    "—",
             })
+
+    # Filtrar por categoría si se especifica
+    if categoria_filtro:
+        normalized = [p for p in normalized if categoria_filtro.lower() in p["categoria"].lower()]
+        log.info(f"Filtrado por '{categoria_filtro}': {len(normalized)} productos.")  # type: ignore
 
     return normalized
 
@@ -246,7 +250,8 @@ def generate_pdf(
     products_raw: list[dict],
     output_path: str,
     place_name: str = "Cafetería",
-    report_date: datetime | None = None
+    report_date: datetime | None = None,
+    categoria_filtro: str | None = None
 ) -> str:
     """
     Genera el PDF de reporte de stock.
@@ -265,7 +270,7 @@ def generate_pdf(
 
     date_str = report_date.strftime("%d/%m/%Y %H:%M")
     styles   = build_styles()
-    products = _normalize_products(products_raw)
+    products = _normalize_products(products_raw, categoria_filtro=categoria_filtro)
 
     # Si no hay datos reales, generar datos de demo
     if not products:
@@ -283,7 +288,8 @@ def generate_pdf(
     story = []
 
     # ── Encabezado ──────────────────────────────────────────────────────────
-    story.append(Paragraph(f"Reporte de Stock", styles["ReportTitle"]))
+    titulo = f"Reporte de Stock — {categoria_filtro}" if categoria_filtro else "Reporte de Stock"
+    story.append(Paragraph(titulo, styles["ReportTitle"]))
     story.append(Paragraph(f"{place_name}  ·  Generado el {date_str}", styles["ReportSubtitle"]))
     story.append(HRFlowable(width="100%", thickness=2, color=COLOR_PRIMARY, spaceAfter=12))
 
