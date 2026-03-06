@@ -155,9 +155,24 @@ def navigate_to_stock(page) -> bool:
 
 def export_and_parse(page) -> list[dict]:
     """
-    Hace clic en 'Exportar', captura el archivo descargado
-    y retorna los datos como lista de dicts.
+    Espera que la tabla de stock cargue y luego hace clic en 'Exportar'.
     """
+    log.info("Esperando que carguen los datos de stock...")
+    try:
+        # Esperar a que aparezca al menos una fila de datos en la tabla
+        page.wait_for_selector(
+            "table tbody tr, "
+            "[class*='row']:not(:empty), "
+            "md-list-item[ng-repeat]",
+            timeout=15000
+        )
+        log.info("Datos de stock cargados.")
+    except PlaywrightTimeout:
+        log.warning("Timeout esperando datos — intentando exportar igual...")
+
+    # Espera adicional para asegurar que todos los datos están renderizados
+    page.wait_for_timeout(6000)
+
     log.info("Buscando botón 'Exportar'...")
     try:
         export_btn = page.locator(
