@@ -115,19 +115,41 @@ def navigate_to_stock(page) -> bool:
     # ── Paso 3: clic en "Stock" en el dropdown ────────────────────────────
     log.info("Buscando opción 'Stock' en el menú desplegable...")
     try:
-        stock_option = page.locator(
-            "button[role='menuitem']:has-text('Stock'), "
-            "p.ng-scope:text-is('Stock'), "
-            "a:has-text('Stock'), "
-            ".ng-scope:text-is('Stock')"
-        ).first
-        # Usar force=True porque Angular puede tener el elemento hidden pero clickeable
-        stock_option.click(force=True, timeout=8000)
-        page.wait_for_load_state("networkidle")
-        log.info("Navegué a la sección Stock exitosamente.")
-        return True
+        page.wait_for_timeout(1000)  # Esperar que el overlay de Angular Material aparezca
+
+        # Buscar todos los botones menuitem y hacer clic en el que dice "Stock"
+        clicked = page.evaluate("""
+            () => {
+                const buttons = document.querySelectorAll('button[role="menuitem"]');
+                for (const btn of buttons) {
+                    if (btn.textContent.trim().includes('Stock')) {
+                        btn.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+                        return btn.textContent.trim();
+                    }
+                }
+                // También buscar en el overlay de Angular Material
+                const allElements = document.querySelectorAll('[role="menuitem"], .md-menu-item button, md-menu-content button');
+                for (const el of allElements) {
+                    if (el.textContent.trim().includes('Stock')) {
+                        el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+                        return 'found via overlay: ' + el.textContent.trim();
+                    }
+                }
+                return null;
+            }
+        """)
+
+        if clicked:
+            log.info(f"Clic en Stock via JS exitoso: {clicked}")
+            page.wait_for_load_state("networkidle")
+            log.info("Navegué a la sección Stock exitosamente.")
+            return True
+        else:
+            log.error("No se encontró el botón Stock en el DOM.")
+            return False
+
     except Exception as e:
-        log.error(f"No se encontró la opción 'Stock': {e}")
+        log.error(f"Error al hacer clic en Stock: {e}")
         return False
 
 
