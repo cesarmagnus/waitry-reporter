@@ -41,6 +41,7 @@ def main():
     recipients   = os.getenv("EMAIL_RECIPIENTS", "").split(",")
     recipients   = [r.strip() for r in recipients if r.strip()]
     demo_mode    = os.getenv("DEMO_MODE", "false").lower() == "true"
+    categoria_filtro = os.getenv("CATEGORIA_FILTRO", "").strip() or None
 
     # Validaciones
     if not demo_mode:
@@ -70,6 +71,7 @@ def main():
         output_path=output_path,
         place_name=place_name,
         report_date=now,
+        categoria_filtro=categoria_filtro,
     )
     log.info("PDF generado correctamente.")
 
