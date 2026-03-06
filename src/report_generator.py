@@ -5,6 +5,7 @@ Usa ReportLab para crear un PDF profesional con tabla, resumen y alertas.
 
 import os
 from datetime import datetime
+import logging
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
