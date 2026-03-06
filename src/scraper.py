@@ -284,6 +284,18 @@ def _parse_excel(filepath: str) -> list[dict]:
                     ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
                     log.info(f"Namespace detectado: '{ns}'")
 
+                    # Log de todas las filas y celdas encontradas
+                    all_rows = root.findall(f'.//{ns}row')
+                    log.info(f"Filas encontradas: {len(all_rows)}")
+                    for i, row in enumerate(all_rows[:5]):
+                        cells_info = []
+                        for c in row.findall(f'{ns}c'):
+                            r = c.get('r', '?')
+                            t = c.get('t', 'n')
+                            v = c.find(f'{ns}v')
+                            cells_info.append(f"{r}(t={t},v={v.text if v is not None else 'None'})")
+                        log.info(f"Fila {i}: {cells_info}")
+
                     rows_data = []
                     for row in root.findall(f'.//{ns}row'):
                         row_values = []
