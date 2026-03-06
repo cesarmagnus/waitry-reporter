@@ -109,6 +109,9 @@ def send_report_multi(
     except Exception as e:
         log.error(f"Error inesperado enviando email: {e}")
     return False
+
+
+def send_report(
     pdf_path: str,
     recipients: list[str],
     place_name: str = "Cafetería",
