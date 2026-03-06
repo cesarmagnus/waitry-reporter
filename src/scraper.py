@@ -221,6 +221,19 @@ def _parse_excel(filepath: str) -> list[dict]:
     is_xls  = header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
 
     if is_xlsx:
+        # Diagnóstico: ver qué hay adentro del ZIP
+        try:
+            import zipfile
+            with zipfile.ZipFile(filepath) as z:
+                log.info(f"Contenido del ZIP: {z.namelist()}")
+        except Exception as ze:
+            log.warning(f"No es un ZIP válido: {ze}")
+            # Leer primeros bytes como texto para ver si es CSV
+            with open(filepath, "r", encoding="utf-8-sig", errors="ignore") as f:
+                preview = f.read(500)
+            log.info(f"Primeros 500 chars del archivo: {preview}")
+            return _parse_csv(filepath)
+
         try:
             import openpyxl
             wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
