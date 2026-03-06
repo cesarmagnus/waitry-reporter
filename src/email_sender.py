@@ -15,7 +15,100 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
-def send_report(
+def send_report_multi(
+    pdf_paths: list[tuple[str, str]],
+    recipients: list[str],
+    place_name: str = "Cafetería",
+    report_date: datetime | None = None
+) -> bool:
+    """
+    Envía un email con múltiples PDFs adjuntos (uno por sucursal).
+
+    Args:
+        pdf_paths: Lista de tuplas (nombre_sucursal, ruta_pdf)
+        recipients: Lista de emails destinatarios
+        place_name: Nombre global del negocio
+        report_date: Fecha del reporte
+    """
+    smtp_host  = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port  = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user  = os.getenv("SMTP_USER")
+    smtp_pass  = os.getenv("SMTP_PASSWORD")
+    email_from = os.getenv("EMAIL_FROM", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        log.error("Faltan variables SMTP_USER y/o SMTP_PASSWORD.")
+        return False
+
+    if report_date is None:
+        report_date = datetime.now()
+
+    date_str     = report_date.strftime("%d/%m/%Y")
+    subject      = f"📦 Reporte de Stock — {place_name} — {date_str}"
+    sucursales   = ", ".join([name for name, _ in pdf_paths])
+
+    msg = MIMEMultipart("alternative")
+    msg["From"]    = f"{place_name} <{email_from}>"
+    msg["To"]      = ", ".join(recipients)
+    msg["Subject"] = subject
+
+    # Lista de sucursales para el cuerpo del email
+    sucursales_html = "".join([
+        f"<li><strong>{name}</strong></li>" for name, _ in pdf_paths
+    ])
+
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #1A1A2E; background: #F4F6FB; margin:0; padding:20px;">
+      <div style="max-width:560px; margin:auto; background:white; border-radius:10px;
+                  box-shadow:0 2px 8px rgba(0,0,0,0.08); overflow:hidden;">
+        <div style="background:#1A1A2E; padding:24px 28px;">
+          <h1 style="color:white; margin:0; font-size:20px;">📦 Reporte de Stock</h1>
+          <p style="color:#AAB4C8; margin:4px 0 0;">{place_name} &nbsp;·&nbsp; {date_str}</p>
+        </div>
+        <div style="padding:24px 28px;">
+          <p>Hola,</p>
+          <p>Adjunto encontrás los reportes diarios de inventario del <strong>{date_str}</strong>
+             para las siguientes sucursales:</p>
+          <ul>{sucursales_html}</ul>
+          <p style="color:#6C757D; font-size:13px;">
+            Este reporte fue generado automáticamente desde Waitry.
+          </p>
+        </div>
+        <div style="background:#F4F6FB; padding:14px 28px; font-size:12px; color:#6C757D;">
+          Generado automáticamente — {report_date.strftime("%d/%m/%Y %H:%M")}
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    msg.attach(MIMEText(html_body, "html"))
+
+    # Adjuntar cada PDF
+    for sucursal_name, pdf_path in pdf_paths:
+        with open(pdf_path, "rb") as f:
+            attachment = MIMEApplication(f.read(), _subtype="pdf")
+            safe_name  = sucursal_name.replace(" ", "_")
+            filename   = f"stock_{safe_name}_{report_date.strftime('%Y%m%d')}.pdf"
+            attachment.add_header("Content-Disposition", "attachment", filename=filename)
+            msg.attach(attachment)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(email_from, recipients, msg.as_string())
+        log.info(f"Email con {len(pdf_paths)} adjuntos enviado a: {', '.join(recipients)}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        log.error("Error de autenticación SMTP.")
+    except smtplib.SMTPException as e:
+        log.error(f"Error SMTP: {e}")
+    except Exception as e:
+        log.error(f"Error inesperado enviando email: {e}")
+    return False
     pdf_path: str,
     recipients: list[str],
     place_name: str = "Cafetería",
