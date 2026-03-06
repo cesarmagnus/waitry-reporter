@@ -15,6 +15,8 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
+log = logging.getLogger(__name__)
+
 # ─── Paleta de colores ─────────────────────────────────────────────────────────
 COLOR_PRIMARY   = colors.HexColor("#1A1A2E")   # Azul marino oscuro
 COLOR_ACCENT    = colors.HexColor("#E94560")   # Rojo/coral para alertas
