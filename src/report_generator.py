@@ -300,7 +300,9 @@ def generate_pdf(
     # ── Encabezado ──────────────────────────────────────────────────────────
     titulo = "Reporte de Stock — Pastelería" if categoria_filtro else "Reporte de Stock"
     story.append(Paragraph(titulo, styles["ReportTitle"]))
-    story.append(Paragraph(f"{place_name}  ·  Generado el {date_str}", styles["ReportSubtitle"]))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(place_name, styles["ReportSubtitle"]))
+    story.append(Paragraph(f"Generado el {date_str}", styles["ReportSubtitle"]))
     story.append(HRFlowable(width="100%", thickness=2, color=COLOR_PRIMARY, spaceAfter=12))
 
     # ── Resumen ─────────────────────────────────────────────────────────────
