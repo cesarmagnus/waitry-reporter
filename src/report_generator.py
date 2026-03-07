@@ -41,7 +41,7 @@ def build_styles():
         fontName="Helvetica-Bold",
         fontSize=22,
         textColor=COLOR_PRIMARY,
-        spaceAfter=4,
+        spaceAfter=8,
         alignment=TA_LEFT,
     ))
     styles.add(ParagraphStyle(
@@ -98,16 +98,18 @@ def build_styles():
     styles.add(ParagraphStyle(
         "SummaryValue",
         fontName="Helvetica-Bold",
-        fontSize=20,
+        fontSize=16,
         textColor=COLOR_PRIMARY,
         alignment=TA_CENTER,
+        spaceAfter=4,
     ))
     styles.add(ParagraphStyle(
         "SummaryLabel",
         fontName="Helvetica",
-        fontSize=8,
+        fontSize=7,
         textColor=GRAY_TEXT,
         alignment=TA_CENTER,
+        leading=9,
     ))
     return styles
 
@@ -175,7 +177,7 @@ def _summary_table(products: list[dict], styles) -> Table:
     ]
 
     col_w = (A4[0] - 4*cm) / 4
-    t = Table(data, colWidths=[col_w]*4, rowHeights=[60])
+    t = Table(data, colWidths=[col_w]*4, rowHeights=[70])
     t.setStyle(TableStyle([
         ("BOX",         (0,0), (-1,-1), 0.5, COLOR_BORDER),
         ("INNERGRID",   (0,0), (-1,-1), 0.5, COLOR_BORDER),
