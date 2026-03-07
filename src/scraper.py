@@ -402,22 +402,16 @@ def get_all_places(page) -> list[dict]:
         # Esperar a que aparezcan los items del ng-repeat
         page.wait_for_selector("md-list-item[ng-repeat*='place in places']", timeout=8000)
 
-        # Extraer placeId y nombre de cada sucursal via JS
+        # Extraer nombre desde aria-label de cada botón
         places = page.evaluate("""
             () => {
-                const items = document.querySelectorAll('md-list-item[ng-repeat*="place in places"]');
+                const buttons = document.querySelectorAll('button[ng-click*="changePlace"][aria-label]');
                 const results = [];
-                for (const item of items) {
-                    // Obtener el botón con ng-click="changePlace(...)"
-                    const btn = item.querySelector('button[ng-click*="changePlace"]');
-                    if (!btn) continue;
-                    const ngClick = btn.getAttribute('ng-click') || '';
-                    const match = ngClick.match(/changePlace\\((.+?)\\)/);
-                    const placeId = match ? match[1].trim() : null;
-                    // Obtener el nombre del elemento ng-binding
-                    const nameEl = item.querySelector('.ng-binding');
-                    const name = nameEl ? nameEl.textContent.trim() : `Sucursal ${results.length + 1}`;
-                    if (placeId) results.push({ placeId, name });
+                for (const btn of buttons) {
+                    const label = btn.getAttribute('aria-label') || '';
+                    // aria-label tiene formato "Nombre ()" — extraer solo el nombre
+                    const name = label.replace(/\\s*\\(.*?\\)\\s*$/, '').trim();
+                    if (name) results.push({ placeId: name, name });
                 }
                 return results;
             }
@@ -438,14 +432,12 @@ def get_all_places(page) -> list[dict]:
 
 
 def switch_place(page, place_id: str, place_name: str) -> bool:
-    """Cambia a la sucursal indicada abriendo el dropdown del header."""
+    """Cambia a la sucursal indicada usando aria-label del botón."""
     log.info(f"Cambiando a sucursal: {place_name}...")
     try:
-        # Cerrar cualquier dropdown abierto primero
+        # Cerrar cualquier dropdown abierto
         page.keyboard.press("Escape")
         page.wait_for_timeout(800)
-
-        # Cerrar también haciendo clic en el body por si Escape no alcanza
         page.locator("body").click(position={"x": 10, "y": 10})
         page.wait_for_timeout(800)
 
@@ -458,17 +450,15 @@ def switch_place(page, place_id: str, place_name: str) -> bool:
         # Esperar opciones
         page.wait_for_selector("md-list-item[ng-repeat*='place in places']", timeout=8000)
 
-        # Clic en la sucursal específica
+        # Clic en el botón cuyo aria-label contiene el nombre de la sucursal
         clicked = page.evaluate(f"""
             () => {{
-                const items = document.querySelectorAll('md-list-item[ng-repeat*="place in places"]');
-                for (const item of items) {{
-                    const btn = item.querySelector('button[ng-click*="changePlace"]');
-                    if (!btn) continue;
-                    const ngClick = btn.getAttribute('ng-click') || '';
-                    if (ngClick.includes('{place_id}')) {{
+                const buttons = document.querySelectorAll('button[ng-click*="changePlace"][aria-label]');
+                for (const btn of buttons) {{
+                    const label = btn.getAttribute('aria-label') || '';
+                    if (label.toLowerCase().includes('{place_name.lower()}')) {{
                         btn.click();
-                        return btn.closest('md-list-item').querySelector('.ng-binding')?.textContent.trim() || 'ok';
+                        return label;
                     }}
                 }}
                 return null;
@@ -481,7 +471,7 @@ def switch_place(page, place_id: str, place_name: str) -> bool:
             page.wait_for_timeout(2000)
             return True
         else:
-            log.error(f"No se encontró botón para placeId: {place_id}")
+            log.error(f"No se encontró botón con aria-label '{place_name}'")
             return False
     except Exception as e:
         log.error(f"Error cambiando sucursal: {e}")
