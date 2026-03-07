@@ -423,8 +423,10 @@ def get_all_places(page) -> list[dict]:
             }
         """)
 
-        # Cerrar el dropdown haciendo clic fuera
+        # Cerrar el dropdown haciendo clic en el body y Escape
         page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+        page.locator("body").click(position={"x": 10, "y": 10})
         page.wait_for_timeout(500)
 
         log.info(f"Sucursales encontradas: {[p['name'] for p in places]}")
@@ -439,7 +441,15 @@ def switch_place(page, place_id: str, place_name: str) -> bool:
     """Cambia a la sucursal indicada abriendo el dropdown del header."""
     log.info(f"Cambiando a sucursal: {place_name}...")
     try:
-        # Abrir dropdown
+        # Cerrar cualquier dropdown abierto primero
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(800)
+
+        # Cerrar también haciendo clic en el body por si Escape no alcanza
+        page.locator("body").click(position={"x": 10, "y": 10})
+        page.wait_for_timeout(800)
+
+        # Abrir dropdown del header
         header = page.locator("div.fleft.ng-binding.ng-scope").first
         header.wait_for(state="visible", timeout=8000)
         header.click()
