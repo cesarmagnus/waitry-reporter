@@ -139,12 +139,12 @@ def _normalize_products(raw_data: list[dict], categoria_filtro: str | None = Non
 
     # Filtrar por categoría si se especifica
     if categoria_filtro:
+        categorias = [c.strip().lower() for c in categoria_filtro.split("|")]
         normalized = [
             p for p in normalized
-            if categoria_filtro.lower() in p["categoria"].lower()
-            and "huevos de chocolate" not in p["categoria"].lower()
+            if any(p["categoria"].lower() == cat for cat in categorias)
         ]
-        log.info(f"Filtrado por '{categoria_filtro}': {len(normalized)} productos.")  # type: ignore
+        log.info(f"Filtrado por categorías: {len(normalized)} productos.")  # type: ignore
 
     return normalized
 
@@ -295,7 +295,7 @@ def generate_pdf(
     story = []
 
     # ── Encabezado ──────────────────────────────────────────────────────────
-    titulo = f"Reporte de Stock — {categoria_filtro}" if categoria_filtro else "Reporte de Stock"
+    titulo = "Reporte de Stock — Pastelería" if categoria_filtro else "Reporte de Stock"
     story.append(Paragraph(titulo, styles["ReportTitle"]))
     story.append(Paragraph(f"{place_name}  ·  Generado el {date_str}", styles["ReportSubtitle"]))
     story.append(HRFlowable(width="100%", thickness=2, color=COLOR_PRIMARY, spaceAfter=12))
