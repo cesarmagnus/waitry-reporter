@@ -3,7 +3,7 @@ name: Reporte Diario de Stock
 on:
   schedule:
     # Todos los días a las 10:00 AM hora Chile (UTC-3 = 13:00 UTC)
-    - cron: "0 13 * * *"
+    - cron: "30 11 * * *"
   workflow_dispatch:  # Permite ejecutarlo manualmente desde GitHub
 
 jobs:
