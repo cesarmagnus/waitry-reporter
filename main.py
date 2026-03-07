@@ -7,7 +7,7 @@ import os
 import sys
 import logging
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 # Agregar src al path
@@ -52,7 +52,8 @@ def main():
             log.error("Falta variable EMAIL_RECIPIENTS.")
             sys.exit(1)
 
-    now = datetime.now()
+    TZ_CHILE = timezone(timedelta(hours=-3))
+    now = datetime.now(tz=TZ_CHILE)
     output_path = f"/tmp/reporte_stock_{now.strftime('%Y%m%d_%H%M')}.pdf"
 
     # ── 1. Scraping de todas las sucursales ───────────────────────────────
