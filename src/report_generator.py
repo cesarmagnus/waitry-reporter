@@ -139,7 +139,10 @@ def _normalize_products(raw_data: list[dict], categoria_filtro: str | None = Non
 
     # Filtrar por categoría si se especifica
     if categoria_filtro:
+        categorias_unicas = sorted(set(p["categoria"] for p in normalized))
+        log.info(f"Categorías disponibles en datos: {categorias_unicas}")
         categorias = [c.strip().lower() for c in categoria_filtro.split("|")]
+        log.info(f"Filtrando por: {categorias}")
         normalized = [
             p for p in normalized
             if any(p["categoria"].lower() == cat for cat in categorias)
