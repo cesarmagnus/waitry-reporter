@@ -47,7 +47,7 @@ jobs:
           SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
           LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
           DEMO_MODE:         "false"
-          CATEGORIA_FILTRO:  "Pastelería"
+          CATEGORIA_FILTRO:  "Pastelería_Dulces y pasteles|Pastelería_Postres y tortas|Pastelería_Galletas"
           DEBUG_MODE:        "true"
         run: python main.py
 
