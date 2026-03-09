@@ -79,11 +79,10 @@ def main():
         pdf_paths.append((place_name, pdf_path))
         log.info(f"PDF generado: {pdf_path}")
 
-    # ── 3. Enviar un solo email con todos los PDFs adjuntos ───────────────
+    # ── 3. Enviar por WhatsApp ────────────────────────────────────────────
     if demo_mode:
-        log.info(f"Modo DEMO — email no enviado. PDFs generados: {[p for _, p in pdf_paths]}")
+        log.info(f"Modo DEMO — PDFs generados: {[p for _, p in pdf_paths]}")
     else:
-        # ── 3. Enviar por WhatsApp ────────────────────────────────────────
         log.info("Enviando reporte por WhatsApp...")
         wa_success = send_whatsapp_report(
             pdf_paths=pdf_paths,
@@ -95,26 +94,6 @@ def main():
         else:
             log.error("❌ Hubo un error al enviar por WhatsApp.")
             sys.exit(1)
-
-        # ── 4. Enviar por WhatsApp (si está configurado) ──────────────────
-        if os.getenv("WHATSAPP_TOKEN") and os.getenv("WHATSAPP_RECIPIENTS"):
-            log.info("Enviando reportes por WhatsApp...")
-            send_whatsapp_pdf(
-                pdf_paths=pdf_paths,
-                place_name=place_name_global,
-                report_date=now,
-            )
-        else:
-            log.info("WhatsApp no configurado, omitiendo.")
-
-    # ── 4. Enviar notificación por WhatsApp ───────────────────────────────
-    if not demo_mode and os.getenv("WA_PHONE_NUMBER_ID") and os.getenv("WA_TOKEN"):
-        log.info("Enviando notificación por WhatsApp...")
-        send_whatsapp_report(
-            pdf_paths=pdf_paths,
-            place_name=place_name_global,
-            report_date=now,
-        )
 
     log.info("=" * 50)
     log.info("  Proceso completado.")
