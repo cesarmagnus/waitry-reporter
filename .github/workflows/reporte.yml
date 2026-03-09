@@ -2,8 +2,8 @@ name: Reporte Diario de Stock
 
 on:
   schedule:
-    # Todos los días a las 10:00 AM hora Chile (UTC-3 = 13:00 UTC)
-    - cron: "30 11 * * *"
+    # Todos los días a las 11:00 AM hora Chile (UTC-3 = 14:00 UTC)
+    - cron: "0 14 * * *"
   workflow_dispatch:  # Permite ejecutarlo manualmente desde GitHub
 
 jobs:
@@ -40,15 +40,15 @@ jobs:
           WAITRY_USER:       ${{ secrets.WAITRY_USER }}
           WAITRY_PASSWORD:   ${{ secrets.WAITRY_PASSWORD }}
           PLACE_NAME:        ${{ secrets.PLACE_NAME }}
-          EMAIL_RECIPIENTS:  ${{ secrets.EMAIL_RECIPIENTS }}
-          SMTP_HOST:         ${{ secrets.SMTP_HOST }}
-          SMTP_PORT:         ${{ secrets.SMTP_PORT }}
-          SMTP_USER:         ${{ secrets.SMTP_USER }}
-          SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
-          LOW_STOCK_THRESHOLD: ${{ secrets.LOW_STOCK_THRESHOLD }}
+          WHATSAPP_TOKEN:    ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          WHATSAPP_RECIPIENTS: ${{ secrets.WHATSAPP_RECIPIENTS }}
           DEMO_MODE:         "false"
           CATEGORIA_FILTRO:  "Pastelería _ Dulces y pasteles|Pastelería _ Postres y tortas|Pastelería _ Galletas"
           DEBUG_MODE:        "true"
+          WA_PHONE_NUMBER_ID: ${{ secrets.WA_PHONE_NUMBER_ID }}
+          WA_TOKEN:          ${{ secrets.WA_TOKEN }}
+          WA_RECIPIENTS:     ${{ secrets.WA_RECIPIENTS }}
         run: python main.py
 
       - name: Subir screenshots de debugging
