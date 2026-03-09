@@ -19,7 +19,9 @@ sys.stderr.reconfigure(line_buffering=True)
 
 from scraper import scrape_all_places
 from report_generator import generate_pdf
-from email_sender import send_report_multi
+from whatsapp_sender import send_whatsapp_report
+from whatsapp_sender import send_whatsapp_pdf
+from whatsapp_sender import send_whatsapp_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,18 +90,38 @@ def main():
     if demo_mode:
         log.info(f"Modo DEMO — email no enviado. PDFs generados: {[p for _, p in pdf_paths]}")
     else:
-        log.info(f"Enviando reporte a: {', '.join(recipients)}")
-        success = send_report_multi(
+        # ── 3. Enviar por WhatsApp ────────────────────────────────────────
+        log.info("Enviando reporte por WhatsApp...")
+        wa_success = send_whatsapp_report(
             pdf_paths=pdf_paths,
-            recipients=recipients,
             place_name=place_name_global,
             report_date=now,
         )
-        if success:
-            log.info("✅ Reporte enviado con éxito.")
+        if wa_success:
+            log.info("✅ WhatsApp enviado con éxito.")
         else:
-            log.error("❌ Hubo un error al enviar el email.")
+            log.error("❌ Hubo un error al enviar por WhatsApp.")
             sys.exit(1)
+
+        # ── 4. Enviar por WhatsApp (si está configurado) ──────────────────
+        if os.getenv("WHATSAPP_TOKEN") and os.getenv("WHATSAPP_RECIPIENTS"):
+            log.info("Enviando reportes por WhatsApp...")
+            send_whatsapp_pdf(
+                pdf_paths=pdf_paths,
+                place_name=place_name_global,
+                report_date=now,
+            )
+        else:
+            log.info("WhatsApp no configurado, omitiendo.")
+
+    # ── 4. Enviar notificación por WhatsApp ───────────────────────────────
+    if not demo_mode and os.getenv("WA_PHONE_NUMBER_ID") and os.getenv("WA_TOKEN"):
+        log.info("Enviando notificación por WhatsApp...")
+        send_whatsapp_report(
+            pdf_paths=pdf_paths,
+            place_name=place_name_global,
+            report_date=now,
+        )
 
     log.info("=" * 50)
     log.info("  Proceso completado.")
