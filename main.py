@@ -20,8 +20,6 @@ sys.stderr.reconfigure(line_buffering=True)
 from scraper import scrape_all_places
 from report_generator import generate_pdf
 from whatsapp_sender import send_whatsapp_report
-from whatsapp_sender import send_whatsapp_pdf
-from whatsapp_sender import send_whatsapp_report
 
 logging.basicConfig(
     level=logging.INFO,
