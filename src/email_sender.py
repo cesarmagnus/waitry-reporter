@@ -44,7 +44,7 @@ def send_report_multi(
         report_date = datetime.now()
 
     date_str     = report_date.strftime("%d/%m/%Y")
-    subject      = f"📦 Reporte de Stock — {place_name} — {date_str}"
+    subject      = f"Reporte diario de Stock Pastelería — {date_str}"
     sucursales   = ", ".join([name for name, _ in pdf_paths])
 
     msg = MIMEMultipart("alternative")
