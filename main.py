@@ -38,8 +38,6 @@ def main():
     waitry_user  = os.getenv("WAITRY_USER")
     waitry_pass  = os.getenv("WAITRY_PASSWORD")
     place_name_global = os.getenv("PLACE_NAME", "Mi Cafetería")
-    recipients   = os.getenv("EMAIL_RECIPIENTS", "").split(",")
-    recipients   = [r.strip() for r in recipients if r.strip()]
     demo_mode    = os.getenv("DEMO_MODE", "false").lower() == "true"
     categoria_filtro = os.getenv("CATEGORIA_FILTRO", "").strip() or None
 
@@ -47,9 +45,6 @@ def main():
     if not demo_mode:
         if not waitry_user or not waitry_pass:
             log.error("Faltan variables WAITRY_USER y/o WAITRY_PASSWORD.")
-            sys.exit(1)
-        if not recipients:
-            log.error("Falta variable EMAIL_RECIPIENTS.")
             sys.exit(1)
 
     TZ_CHILE = timezone(timedelta(hours=-3))
